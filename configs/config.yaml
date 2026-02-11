@@ -1,0 +1,30 @@
+bot:
+  target_qq: 0           # 只回复这一个人的 QQ 号
+  owner_qq: 0            # 管理员 QQ 号（你自己）
+  my_name: ""            # 你的名字（用于 prompt）
+  target_name: ""        # 对方的名字（用于 prompt）
+  reply_delay_min_ms: 1000
+  reply_delay_max_ms: 3000
+  max_context_turns: 20
+  session_timeout_min: 30
+
+napcat:
+  ws_url: "ws://napcat:3001"
+  access_token: ""
+
+gemini:
+  api_key: ""                      # 优先从环境变量 GEMINI_API_KEY 读取
+  chat_model: "gemini-3-pro-preview"
+  embedding_model: "text-embedding-004"
+  temperature: 0.8
+  max_output_tokens: 512
+  rpm_limit: 10                      # preview 模型限流可能更严，先设低一点
+
+rag:
+  vectors_dir: "./data/vectors"
+  top_k: 5
+  min_similarity: 0.3
+
+data:
+  sessions_dir: "./data/sessions"
+  persona_file: "./data/persona.json"

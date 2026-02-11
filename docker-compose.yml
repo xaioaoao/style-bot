@@ -1,0 +1,35 @@
+services:
+  napcat:
+    image: mlikiowa/napcat-docker:latest
+    container_name: napcat
+    environment:
+      - NAPCAT_UID=1000
+      - NAPCAT_GID=1000
+    ports:
+      - "6099:6099"
+    volumes:
+      - ./napcat/config:/app/napcat/config
+      - ./ntqq:/app/.config/QQ
+    networks:
+      - bot-network
+    mac_address: "02:42:ac:11:00:02"
+    restart: always
+
+  style-bot:
+    build: .
+    container_name: style-bot
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - NAPCAT_ACCESS_TOKEN=${NAPCAT_ACCESS_TOKEN}
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs
+    depends_on:
+      - napcat
+    networks:
+      - bot-network
+    restart: always
+
+networks:
+  bot-network:
+    driver: bridge
