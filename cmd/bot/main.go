@@ -31,10 +31,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Gemini 客户端
+	// Gemini 客户端（多模型轮换）
+	chatModels := cfg.Gemini.ChatModels
+	if len(chatModels) == 0 && cfg.Gemini.ChatModel != "" {
+		chatModels = []string{cfg.Gemini.ChatModel}
+	}
 	aiClient, err := ai.NewClient(ctx,
 		cfg.Gemini.APIKey,
-		cfg.Gemini.ChatModel,
+		chatModels,
 		cfg.Gemini.EmbeddingModel,
 		cfg.Gemini.Temperature,
 		cfg.Gemini.MaxOutputTokens,

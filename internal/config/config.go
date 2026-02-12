@@ -34,7 +34,8 @@ type NapCatConfig struct {
 
 type GeminiConfig struct {
 	APIKey          string  `mapstructure:"api_key"`
-	ChatModel       string  `mapstructure:"chat_model"`
+	ChatModel       string   `mapstructure:"chat_model"`
+	ChatModels      []string `mapstructure:"chat_models"`
 	EmbeddingModel  string  `mapstructure:"embedding_model"`
 	Temperature     float32 `mapstructure:"temperature"`
 	MaxOutputTokens int32   `mapstructure:"max_output_tokens"`
