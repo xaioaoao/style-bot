@@ -9,7 +9,7 @@ bot:
   session_timeout_min: 30
 
 napcat:
-  ws_url: "ws://napcat:3001"
+  ws_url: "ws://127.0.0.1:3001"
   access_token: ""
 
 gemini:
@@ -17,9 +17,9 @@ gemini:
   chat_model: "gemini-2.5-pro"
   chat_models:                         # 429 时自动轮换
     - "gemini-2.5-pro"                 # RPD 1.5K
-    - "gemini-2-flash"                 # RPD 1.5K
-    - "gemini-2.5-flash"              # RPD 20
+    - "gemini-2.0-flash"              # RPD 1.5K
     - "gemini-3-pro-preview"           # RPD 1.5K
+    - "gemini-2.5-flash"              # RPD 20
     - "gemini-3-flash-preview"         # RPD 20
   embedding_model: "gemini-embedding-001"
   temperature: 0.8
