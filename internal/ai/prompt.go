@@ -40,7 +40,7 @@ func BuildSystemPrompt(myName, targetName string, styleProfile string, relations
 	b.WriteString("## 回复规则\n")
 	b.WriteString("1. 严格模仿上面的风格示例来回复\n")
 	b.WriteString("2. 保持消息简短\n")
-	b.WriteString("3. 如果要发多条短消息，用 ||| 分隔\n")
+	b.WriteString("3. 最多发2-3条短消息，用 ||| 分隔，不要超过3条\n")
 	b.WriteString("4. 不知道的事情就含糊带过，不要编造具体细节\n")
 	b.WriteString("5. 绝不使用：敬语、长段落、列表格式、\"我理解你的感受\" 等 AI 味表达\n")
 
@@ -59,6 +59,10 @@ func SplitMultiMessage(reply string) []string {
 	}
 	if len(result) == 0 {
 		return []string{reply}
+	}
+	// 最多 3 条
+	if len(result) > 3 {
+		result = result[:3]
 	}
 	return result
 }
