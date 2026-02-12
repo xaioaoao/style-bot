@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	chromem "github.com/philippgille/chromem-go"
 	"google.golang.org/genai"
 )
 
@@ -17,6 +18,7 @@ type Client struct {
 	chatModels []string // 多模型轮换
 	modelIdx   atomic.Int64
 	embedModel string
+	ollamaURL  string // 本地 Ollama URL，非空时 embedding 走 Ollama
 	temp       float32
 	maxTokens  int32
 
@@ -27,7 +29,7 @@ type Client struct {
 	lastTick time.Time
 }
 
-func NewClient(ctx context.Context, apiKey string, chatModels []string, embedModel string, temp float32, maxTokens int32, rpmLimit int) (*Client, error) {
+func NewClient(ctx context.Context, apiKey string, chatModels []string, embedModel, ollamaURL string, temp float32, maxTokens int32, rpmLimit int) (*Client, error) {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  apiKey,
 		Backend: genai.BackendGeminiAPI,
@@ -40,6 +42,7 @@ func NewClient(ctx context.Context, apiKey string, chatModels []string, embedMod
 		client:     client,
 		chatModels: chatModels,
 		embedModel: embedModel,
+		ollamaURL:  ollamaURL,
 		temp:       temp,
 		maxTokens:  maxTokens,
 		rpmLimit:   rpmLimit,
@@ -104,37 +107,32 @@ func (c *Client) GenerateChat(ctx context.Context, systemPrompt string, history 
 	return "", fmt.Errorf("all models exhausted after %d attempts: %w", totalAttempts, lastErr)
 }
 
-// Embed 生成文本嵌入向量
-func (c *Client) Embed(ctx context.Context, text string) ([]float32, error) {
-	if err := c.waitForToken(ctx); err != nil {
-		return nil, err
-	}
-
-	var lastErr error
-	for attempt := 0; attempt < 3; attempt++ {
-		resp, err := c.client.Models.EmbedContent(ctx, c.embedModel,
-			[]*genai.Content{genai.NewContentFromText(text, genai.RoleUser)}, nil)
-		if err != nil {
-			lastErr = err
-			slog.Warn("embed failed, retrying", "attempt", attempt+1, "error", err)
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(time.Duration(1<<attempt) * time.Second):
-			}
-			continue
-		}
-		if len(resp.Embeddings) == 0 {
-			return nil, fmt.Errorf("empty embedding response")
-		}
-		return resp.Embeddings[0].Values, nil
-	}
-	return nil, fmt.Errorf("embed failed after 3 attempts: %w", lastErr)
-}
-
 // EmbedFunc 返回一个可用于 chromem-go 的 embedding 函数
-func (c *Client) EmbedFunc() func(ctx context.Context, text string) ([]float32, error) {
-	return c.Embed
+// 优先使用 Ollama（本地，免费无限），回退到 Gemini API
+func (c *Client) EmbedFunc() chromem.EmbeddingFunc {
+	if c.ollamaURL != "" {
+		slog.Info("using Ollama for embedding", "model", c.embedModel, "url", c.ollamaURL)
+		return chromem.NewEmbeddingFuncOllama(c.embedModel, c.ollamaURL)
+	}
+	slog.Info("using Gemini API for embedding", "model", c.embedModel)
+	return func(ctx context.Context, text string) ([]float32, error) {
+		var lastErr error
+		for attempt := 0; attempt < 3; attempt++ {
+			resp, err := c.client.Models.EmbedContent(ctx, c.embedModel,
+				[]*genai.Content{genai.NewContentFromText(text, genai.RoleUser)}, nil)
+			if err != nil {
+				lastErr = err
+				slog.Warn("embed failed, retrying", "attempt", attempt+1, "error", err)
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+				continue
+			}
+			if len(resp.Embeddings) == 0 {
+				return nil, fmt.Errorf("empty embedding response")
+			}
+			return resp.Embeddings[0].Values, nil
+		}
+		return nil, fmt.Errorf("embed failed after 3 attempts: %w", lastErr)
+	}
 }
 
 // waitForToken 简单令牌桶限流

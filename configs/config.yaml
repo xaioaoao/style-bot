@@ -21,7 +21,8 @@ gemini:
     - "gemini-3-pro-preview"           # RPD 1.5K
     - "gemini-2.5-flash"              # RPD 20
     - "gemini-3-flash-preview"         # RPD 20
-  embedding_model: "gemini-embedding-001"
+  embedding_model: "nomic-embed-text"    # 本地 Ollama 模型，不需要 API 额度
+  ollama_url: "http://127.0.0.1:11434/api"
   temperature: 0.8
   max_output_tokens: 512
   rpm_limit: 10

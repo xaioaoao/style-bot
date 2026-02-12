@@ -15,13 +15,13 @@ type Store struct {
 }
 
 // NewStore 创建或加载向量存储
-func NewStore(vectorsDir string, embedFunc func(ctx context.Context, text string) ([]float32, error)) (*Store, error) {
+func NewStore(vectorsDir string, embedFunc chromem.EmbeddingFunc) (*Store, error) {
 	db, err := chromem.NewPersistentDB(vectorsDir, false)
 	if err != nil {
 		return nil, fmt.Errorf("open vector db: %w", err)
 	}
 
-	col, err := db.GetOrCreateCollection("conversations", nil, chromem.EmbeddingFunc(embedFunc))
+	col, err := db.GetOrCreateCollection("conversations", nil, embedFunc)
 	if err != nil {
 		return nil, fmt.Errorf("get/create collection: %w", err)
 	}

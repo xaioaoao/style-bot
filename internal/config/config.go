@@ -36,7 +36,8 @@ type GeminiConfig struct {
 	APIKey          string  `mapstructure:"api_key"`
 	ChatModel       string   `mapstructure:"chat_model"`
 	ChatModels      []string `mapstructure:"chat_models"`
-	EmbeddingModel  string  `mapstructure:"embedding_model"`
+	EmbeddingModel  string   `mapstructure:"embedding_model"`
+	OllamaURL       string   `mapstructure:"ollama_url"`
 	Temperature     float32 `mapstructure:"temperature"`
 	MaxOutputTokens int32   `mapstructure:"max_output_tokens"`
 	RPMLimit        int     `mapstructure:"rpm_limit"`

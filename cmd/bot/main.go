@@ -40,6 +40,7 @@ func main() {
 		cfg.Gemini.APIKey,
 		chatModels,
 		cfg.Gemini.EmbeddingModel,
+		cfg.Gemini.OllamaURL,
 		cfg.Gemini.Temperature,
 		cfg.Gemini.MaxOutputTokens,
 		cfg.Gemini.RPMLimit,

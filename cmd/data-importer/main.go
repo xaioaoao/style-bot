@@ -148,26 +148,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 3. 风格分析
-	slog.Info("analyzing speaking style...")
-	p, err := analyzeStyle(ctx, client, messages, conversations, *myName, *targetName)
-	if err != nil {
-		slog.Error("style analysis failed", "error", err)
-		os.Exit(1)
-	}
-
-	// 保存 persona.json
+	// 3. 风格分析（如果 persona.json 已存在则跳过）
 	personaPath := filepath.Join(*outputDir, "persona.json")
 	if err := os.MkdirAll(*outputDir, 0755); err != nil {
 		slog.Error("create output dir failed", "error", err)
 		os.Exit(1)
 	}
-	personaData, _ := json.MarshalIndent(p, "", "  ")
-	if err := os.WriteFile(personaPath, personaData, 0644); err != nil {
-		slog.Error("write persona.json failed", "error", err)
-		os.Exit(1)
+	if _, err := os.Stat(personaPath); err == nil {
+		slog.Info("persona.json already exists, skipping style analysis")
+	} else {
+		slog.Info("analyzing speaking style...")
+		p, err := analyzeStyle(ctx, client, messages, conversations, *myName, *targetName)
+		if err != nil {
+			slog.Error("style analysis failed", "error", err)
+			os.Exit(1)
+		}
+		personaData, _ := json.MarshalIndent(p, "", "  ")
+		if err := os.WriteFile(personaPath, personaData, 0644); err != nil {
+			slog.Error("write persona.json failed", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("saved persona", "path", personaPath)
 	}
-	slog.Info("saved persona", "path", personaPath)
 
 	// 4. 构建 embedding 客户端池（多 key 轮换）
 	var embedClients []*genai.Client
@@ -192,7 +194,11 @@ func main() {
 	// 5. 向量化对话片段
 	slog.Info("vectorizing conversations...")
 	vectorsDir := filepath.Join(*outputDir, "vectors")
-	if err := vectorize(ctx, embedClients, conversations, vectorsDir, *myName, *targetName); err != nil {
+	ollamaURL := os.Getenv("OLLAMA_URL")
+	if ollamaURL == "" {
+		ollamaURL = "http://127.0.0.1:11434/api"
+	}
+	if err := vectorize(ctx, conversations, vectorsDir, *myName, *targetName, ollamaURL); err != nil {
 		slog.Error("vectorize failed", "error", err)
 		os.Exit(1)
 	}
@@ -304,51 +310,21 @@ func analyzeStyle(ctx context.Context, client *genai.Client, messages []parser.C
 	return &p, nil
 }
 
-func vectorize(ctx context.Context, clients []*genai.Client, conversations []parser.Conversation, vectorsDir string, myName, targetName string) error {
+func vectorize(ctx context.Context, conversations []parser.Conversation, vectorsDir string, myName, targetName string, ollamaURL string) error {
 	if err := os.MkdirAll(vectorsDir, 0755); err != nil {
 		return fmt.Errorf("create vectors dir: %w", err)
 	}
 
-	// 轮换计数器
-	var callCount int64
-
-	embedFunc := func(ctx context.Context, text string) ([]float32, error) {
-		// 轮换使用不同的 API key
-		idx := callCount % int64(len(clients))
-		callCount++
-		c := clients[idx]
-
-		var lastErr error
-		for attempt := 0; attempt < 5; attempt++ {
-			resp, err := c.Models.EmbedContent(ctx, "gemini-embedding-001",
-				[]*genai.Content{genai.NewContentFromText(text, genai.RoleUser)}, nil)
-			if err == nil {
-				if len(resp.Embeddings) == 0 {
-					return nil, fmt.Errorf("empty embedding")
-				}
-				return resp.Embeddings[0].Values, nil
-			}
-			lastErr = err
-			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") {
-				wait := time.Duration(10*(attempt+1)) * time.Second
-				slog.Warn("rate limited, retrying", "attempt", attempt+1, "wait", wait)
-				time.Sleep(wait)
-				// 限流时切换到另一个 key
-				idx = (idx + 1) % int64(len(clients))
-				c = clients[idx]
-				continue
-			}
-			return nil, err
-		}
-		return nil, fmt.Errorf("max retries: %w", lastErr)
-	}
+	// 使用 Ollama 本地 embedding
+	embedFunc := chromem.NewEmbeddingFuncOllama("nomic-embed-text", ollamaURL)
+	slog.Info("using Ollama for embedding", "url", ollamaURL)
 
 	db, err := chromem.NewPersistentDB(vectorsDir, false)
 	if err != nil {
 		return fmt.Errorf("create vector db: %w", err)
 	}
 
-	col, err := db.GetOrCreateCollection("conversations", nil, chromem.EmbeddingFunc(embedFunc))
+	col, err := db.GetOrCreateCollection("conversations", nil, embedFunc)
 	if err != nil {
 		return fmt.Errorf("create collection: %w", err)
 	}
