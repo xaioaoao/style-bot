@@ -95,41 +95,30 @@ func (c *Client) GenerateChat(ctx context.Context, systemPrompt string, history 
 		MaxOutputTokens:   c.maxTokens,
 	}
 
-	// 遍历所有 key × model 组合
-	totalAttempts := len(c.clients) * len(c.chatModels)
+	// 策略：对每个模型，先试所有 key；全部 429 再降到下一个模型
 	var lastErr error
-	for attempt := 0; attempt < totalAttempts; attempt++ {
-		clientIdx := c.clientIdx.Load() % int64(len(c.clients))
-		client := c.clients[clientIdx]
-		model := c.currentModel()
-
-		resp, err := client.Models.GenerateContent(ctx, model, contents, cfg)
-		if err != nil {
-			lastErr = err
-			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") {
-				slog.Warn("quota exceeded, switching", "key", clientIdx, "model", model, "attempt", attempt+1)
-				c.rotateModel()
-				// 每轮完所有模型后换下一个 key
-				if int(c.modelIdx.Load())%len(c.chatModels) == 0 {
-					c.clientIdx.Add(1)
+	for mi, model := range c.chatModels {
+		for ki, client := range c.clients {
+			resp, err := client.Models.GenerateContent(ctx, model, contents, cfg)
+			if err != nil {
+				lastErr = err
+				if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") {
+					slog.Warn("quota exceeded", "key", ki, "model", model)
+					continue // 换下一个 key
 				}
-				time.Sleep(500 * time.Millisecond)
+				if strings.Contains(err.Error(), "404") {
+					slog.Warn("model not found, skipping", "model", model)
+					break // 换下一个模型
+				}
+				slog.Warn("generate failed", "key", ki, "model", model, "error", err)
 				continue
 			}
-			if strings.Contains(err.Error(), "404") {
-				slog.Warn("model not found, skipping", "model", model)
-				c.rotateModel()
-				continue
-			}
-			slog.Warn("generate failed", "model", model, "error", err)
-			time.Sleep(time.Second)
-			continue
+			text := resp.Text()
+			slog.Info("generated reply", "key", ki, "model", model, "model_rank", mi+1)
+			return text, nil
 		}
-		text := resp.Text()
-		slog.Debug("generated reply", "key", clientIdx, "model", model)
-		return text, nil
 	}
-	return "", fmt.Errorf("all keys and models exhausted after %d attempts: %w", totalAttempts, lastErr)
+	return "", fmt.Errorf("all keys and models exhausted: %w", lastErr)
 }
 
 // EmbedFunc 返回一个可用于 chromem-go 的 embedding 函数
