@@ -77,9 +77,9 @@ func (b *Bot) Stop() {
 }
 
 func (b *Bot) handleMessage(ctx context.Context, zctx *zero.Ctx) {
-	userMsg := zctx.ExtractPlainText()
-	if strings.TrimSpace(userMsg) == "" {
-		return
+	userMsg := strings.TrimSpace(zctx.ExtractPlainText())
+	if userMsg == "" {
+		return // 跳过纯表情/图片等非文本消息
 	}
 
 	slog.Info("received message", "from", zctx.Event.UserID, "text", userMsg)

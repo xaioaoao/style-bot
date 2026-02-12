@@ -60,6 +60,9 @@ func (m *Manager) AddUserMessage(content string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if strings.TrimSpace(content) == "" {
+		return
+	}
 	m.session.Messages = append(m.session.Messages, Message{
 		Role:      "user",
 		Content:   content,
@@ -71,6 +74,9 @@ func (m *Manager) AddUserMessage(content string) {
 
 // AddBotReply 添加 bot 的回复
 func (m *Manager) AddBotReply(content string) {
+	if strings.TrimSpace(content) == "" {
+		return
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
