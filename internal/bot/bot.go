@@ -116,11 +116,17 @@ func (b *Bot) handleMessage(ctx context.Context, zctx *zero.Ctx) {
 		history = history[:len(history)-1]
 	}
 
-	// 调 Gemini 生成回复
+	// 调 Gemini 生成回复，失败时兜底
 	reply, err := b.ai.GenerateChat(ctx, systemPrompt, history, userMsg)
 	if err != nil {
-		slog.Error("generate reply failed", "error", err)
-		return
+		slog.Error("generate reply failed, using fallback", "error", err)
+		// 兜底：清掉历史重试一次（可能是历史数据有问题）
+		reply, err = b.ai.GenerateChat(ctx, systemPrompt, nil, userMsg)
+		if err != nil {
+			slog.Error("fallback also failed, sending simple reply", "error", err)
+			// 最终兜底：从风格档案里随机挑一个回复
+			reply = b.fallbackReply()
+		}
 	}
 
 	// 后处理
@@ -161,6 +167,14 @@ func (b *Bot) ownerFilter() zero.Rule {
 	return func(ctx *zero.Ctx) bool {
 		return ctx.Event.UserID == b.cfg.Bot.OwnerQQ
 	}
+}
+
+func (b *Bot) fallbackReply() string {
+	fallbacks := []string{"嗯嗯", "好呢", "哈哈", "嘻嘻", "在呢", "怎么啦", "好好好"}
+	if b.persona != nil && len(b.persona.Style.AgreementExamples) > 0 {
+		fallbacks = b.persona.Style.AgreementExamples
+	}
+	return fallbacks[rand.IntN(len(fallbacks))]
 }
 
 func (b *Bot) randomDelay() time.Duration {
