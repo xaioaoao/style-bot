@@ -32,15 +32,18 @@ var wxToQQFace = map[string]int{
 }
 
 var wxEmojiRegex = regexp.MustCompile(`\[([^\[\]]+)\]`)
+var brokenEmojiRegex = regexp.MustCompile(`\[([^\[\]]+)(?:\]|$)`)
 
 // ConvertWxEmojiToQQ 把微信格式 [表情名] 转换为 QQ CQ 码
+// 也处理 Gemini 输出的不完整格式如 [调皮 （缺少右括号）
 func ConvertWxEmojiToQQ(text string) string {
-	return wxEmojiRegex.ReplaceAllStringFunc(text, func(match string) string {
-		name := strings.TrimPrefix(strings.TrimSuffix(match, "]"), "[")
+	return brokenEmojiRegex.ReplaceAllStringFunc(text, func(match string) string {
+		name := strings.TrimPrefix(match, "[")
+		name = strings.TrimSuffix(name, "]")
+		name = strings.TrimSpace(name)
 		if faceID, ok := wxToQQFace[name]; ok {
 			return fmt.Sprintf("[CQ:face,id=%d]", faceID)
 		}
-		// 不认识的表情保留原样
 		return match
 	})
 }
