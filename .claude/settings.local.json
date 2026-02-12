@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: style-bot - AI chatbot that mimics personal speaking style\n\n- Chat history parser \\(HTML/Text from WechatExporter\\)\n- Gemini-powered style analysis and persona generation\n- RAG pipeline with ChromemDB vector store\n- QQ bot integration via NapCat WebSocket\n- Data import pipeline with vectorization\n- Mac WeChat key extraction tool\n\nCo-Authored-By: Claude Opus 4.6 \\(1M context\\) <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(gh repo create:*)",
+      "Bash(gh repo edit:*)"
+    ]
+  }
+}

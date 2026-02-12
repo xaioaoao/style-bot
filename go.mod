@@ -7,6 +7,7 @@ require (
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/spf13/viper v1.21.0
 	github.com/wdvxdr1123/ZeroBot v1.8.2
+	golang.org/x/crypto v0.44.0
 	google.golang.org/genai v1.46.0
 )
 
@@ -39,7 +40,6 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect

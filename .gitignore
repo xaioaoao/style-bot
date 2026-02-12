@@ -1,4 +1,12 @@
 data/vectors/
 data/sessions/
+data/persona.json
+data/import_report.txt
 ntqq/
+napcat-config/
 *.env
+*.enc
+training_data*
+build/
+tools/extract_key.py
+db_key.txt
