@@ -15,12 +15,15 @@ napcat:
 gemini:
   api_key: ""                      # 优先从环境变量 GEMINI_API_KEY 读取
   chat_model: "gemini-2.5-pro"
-  chat_models:                         # 429 时自动轮换
-    - "gemini-2.5-pro"                 # RPD 1.5K
-    - "gemini-2.0-flash"              # RPD 1.5K
-    - "gemini-3-pro-preview"           # RPD 1.5K
-    - "gemini-2.5-flash"              # RPD 20
-    - "gemini-3-flash-preview"         # RPD 20
+  chat_models:                         # 高级优先，429 后降级
+    - "gemini-3-pro-preview"           # 最强 RPD 1.5K
+    - "gemini-2.5-pro"                 # 强   RPD 1.5K
+    - "gemini-3-flash-preview"         # 快强 RPD 20
+    - "gemini-2.5-flash"              # 快   RPD 20
+    - "gemini-2.0-flash"              # 稳定 RPD 1.5K
+    - "gemini-2.0-flash-exp"          # 实验 RPD 1.5K
+    - "gemini-2.0-flash-lite"         # 轻量 RPD 1.5K
+    - "gemini-2.5-flash-lite"         # 轻量 RPD 20
   embedding_model: "nomic-embed-text"    # 本地 Ollama 模型，不需要 API 额度
   ollama_url: "http://127.0.0.1:11434/api"
   temperature: 0.8

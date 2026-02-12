@@ -36,8 +36,12 @@ func main() {
 	if len(chatModels) == 0 && cfg.Gemini.ChatModel != "" {
 		chatModels = []string{cfg.Gemini.ChatModel}
 	}
+	apiKeys := []string{cfg.Gemini.APIKey}
+	if key2 := os.Getenv("GEMINI_API_KEY2"); key2 != "" {
+		apiKeys = append(apiKeys, key2)
+	}
 	aiClient, err := ai.NewClient(ctx,
-		cfg.Gemini.APIKey,
+		apiKeys,
 		chatModels,
 		cfg.Gemini.EmbeddingModel,
 		cfg.Gemini.OllamaURL,

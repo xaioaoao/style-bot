@@ -14,11 +14,12 @@ import (
 )
 
 type Client struct {
-	client     *genai.Client
+	clients    []*genai.Client // 多 key 轮换
+	clientIdx  atomic.Int64
 	chatModels []string // 多模型轮换
 	modelIdx   atomic.Int64
 	embedModel string
-	ollamaURL  string // 本地 Ollama URL，非空时 embedding 走 Ollama
+	ollamaURL  string
 	temp       float32
 	maxTokens  int32
 
@@ -29,17 +30,28 @@ type Client struct {
 	lastTick time.Time
 }
 
-func NewClient(ctx context.Context, apiKey string, chatModels []string, embedModel, ollamaURL string, temp float32, maxTokens int32, rpmLimit int) (*Client, error) {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  apiKey,
-		Backend: genai.BackendGeminiAPI,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create genai client: %w", err)
+func NewClient(ctx context.Context, apiKeys []string, chatModels []string, embedModel, ollamaURL string, temp float32, maxTokens int32, rpmLimit int) (*Client, error) {
+	var clients []*genai.Client
+	for _, key := range apiKeys {
+		if key == "" {
+			continue
+		}
+		client, err := genai.NewClient(ctx, &genai.ClientConfig{
+			APIKey:  key,
+			Backend: genai.BackendGeminiAPI,
+		})
+		if err != nil {
+			slog.Warn("skip api key", "error", err)
+			continue
+		}
+		clients = append(clients, client)
+	}
+	if len(clients) == 0 {
+		return nil, fmt.Errorf("no valid API keys")
 	}
 
 	c := &Client{
-		client:     client,
+		clients:    clients,
 		chatModels: chatModels,
 		embedModel: embedModel,
 		ollamaURL:  ollamaURL,
@@ -49,6 +61,7 @@ func NewClient(ctx context.Context, apiKey string, chatModels []string, embedMod
 		tokens:     rpmLimit,
 		lastTick:   time.Now(),
 	}
+	slog.Info("AI clients ready", "keys", len(clients), "models", len(chatModels))
 	return c, nil
 }
 
@@ -82,29 +95,41 @@ func (c *Client) GenerateChat(ctx context.Context, systemPrompt string, history 
 		MaxOutputTokens:   c.maxTokens,
 	}
 
-	// 尝试所有模型，每个模型最多重试 2 次
-	totalAttempts := len(c.chatModels) * 2
+	// 遍历所有 key × model 组合
+	totalAttempts := len(c.clients) * len(c.chatModels)
 	var lastErr error
 	for attempt := 0; attempt < totalAttempts; attempt++ {
+		clientIdx := c.clientIdx.Load() % int64(len(c.clients))
+		client := c.clients[clientIdx]
 		model := c.currentModel()
-		resp, err := c.client.Models.GenerateContent(ctx, model, contents, cfg)
+
+		resp, err := client.Models.GenerateContent(ctx, model, contents, cfg)
 		if err != nil {
 			lastErr = err
 			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") {
-				slog.Warn("model quota exceeded, switching", "model", model, "attempt", attempt+1)
+				slog.Warn("quota exceeded, switching", "key", clientIdx, "model", model, "attempt", attempt+1)
 				c.rotateModel()
-				time.Sleep(time.Second)
+				// 每轮完所有模型后换下一个 key
+				if int(c.modelIdx.Load())%len(c.chatModels) == 0 {
+					c.clientIdx.Add(1)
+				}
+				time.Sleep(500 * time.Millisecond)
 				continue
 			}
-			slog.Warn("generate failed, retrying", "model", model, "attempt", attempt+1, "error", err)
-			time.Sleep(time.Duration(1<<attempt) * time.Second)
+			if strings.Contains(err.Error(), "404") {
+				slog.Warn("model not found, skipping", "model", model)
+				c.rotateModel()
+				continue
+			}
+			slog.Warn("generate failed", "model", model, "error", err)
+			time.Sleep(time.Second)
 			continue
 		}
 		text := resp.Text()
-		slog.Debug("generated reply", "model", model)
+		slog.Debug("generated reply", "key", clientIdx, "model", model)
 		return text, nil
 	}
-	return "", fmt.Errorf("all models exhausted after %d attempts: %w", totalAttempts, lastErr)
+	return "", fmt.Errorf("all keys and models exhausted after %d attempts: %w", totalAttempts, lastErr)
 }
 
 // EmbedFunc 返回一个可用于 chromem-go 的 embedding 函数
@@ -118,7 +143,7 @@ func (c *Client) EmbedFunc() chromem.EmbeddingFunc {
 	return func(ctx context.Context, text string) ([]float32, error) {
 		var lastErr error
 		for attempt := 0; attempt < 3; attempt++ {
-			resp, err := c.client.Models.EmbedContent(ctx, c.embedModel,
+			resp, err := c.clients[0].Models.EmbedContent(ctx, c.embedModel,
 				[]*genai.Content{genai.NewContentFromText(text, genai.RoleUser)}, nil)
 			if err != nil {
 				lastErr = err
