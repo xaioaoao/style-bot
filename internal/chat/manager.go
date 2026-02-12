@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -88,6 +89,9 @@ func (m *Manager) GetHistory() []*genai.Content {
 
 	contents := make([]*genai.Content, 0, len(m.session.Messages))
 	for _, msg := range m.session.Messages {
+		if strings.TrimSpace(msg.Content) == "" {
+			continue // 跳过空消息，避免 API 400 错误
+		}
 		var role genai.Role = genai.RoleUser
 		if msg.Role == "model" {
 			role = genai.RoleModel
