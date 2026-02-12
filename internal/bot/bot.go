@@ -149,6 +149,9 @@ func (b *Bot) handleMessage(ctx context.Context, zctx *zero.Ctx) {
 
 func (b *Bot) targetFilter() zero.Rule {
 	return func(ctx *zero.Ctx) bool {
+		if b.cfg.Bot.TargetQQ == 0 {
+			return true // 不限制，回复所有人
+		}
 		return ctx.Event.UserID == b.cfg.Bot.TargetQQ
 	}
 }

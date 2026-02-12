@@ -78,9 +78,6 @@ func Load(path string) (*Config, error) {
 	if cfg.Gemini.APIKey == "" {
 		return nil, fmt.Errorf("gemini.api_key is required (set in config or GEMINI_API_KEY env)")
 	}
-	if cfg.Bot.TargetQQ == 0 {
-		return nil, fmt.Errorf("bot.target_qq is required")
-	}
 
 	return &cfg, nil
 }
