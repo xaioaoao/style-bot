@@ -133,9 +133,8 @@ func (b *Bot) handleMessage(ctx context.Context, zctx *zero.Ctx) {
 			delay := b.randomDelay()
 			time.Sleep(delay)
 		}
-		// 转换微信表情为 QQ 表情
-		part = ConvertWxEmojiToQQ(part)
-		zctx.SendChain(message.ParseMessageFromString(part)...)
+		part = ConvertWxEmoji(part)
+		zctx.Send(message.Text(part))
 	}
 
 	// 记录 bot 回复到上下文
